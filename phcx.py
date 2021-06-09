@@ -139,7 +139,7 @@ def phase_plots(cand):
     plt.xlabel('Phase Bin Index')
     
     plt.tight_layout()
-    plt.show()
+    # plt.show()
     
 
 def bullseye_plot(cand):
@@ -163,7 +163,7 @@ def bullseye_plot(cand):
     cb.set_label('Folded S/N')
     
     plt.tight_layout()
-    plt.show()
+   # plt.show()
 
 
 def find_peak(cand):
@@ -193,8 +193,6 @@ def find_peak_subbands(cand):
 def transform_subbands(cand):
     peak_index = find_peak(cand)
     middle_index = (len(cand.subbands[0]) / 2) - 1
-    print(len(cand.subbands))
-    print(len(cand.subbands[0]))
     diff = peak_index - middle_index
     new_subbands = numpy.zeros((19, 64))
     i = 0
@@ -210,8 +208,6 @@ def transform_subbands(cand):
 def transform_subints(cand):
     peak_index = find_peak(cand)
     middle_index = (len(cand.subints[0]) / 2) - 1
-    print(len(cand.subints))
-    print(len(cand.subints[0]))
     diff = peak_index - middle_index
     new_subints = numpy.zeros((19, 64))
     i = 0
@@ -222,6 +218,18 @@ def transform_subints(cand):
         i += 1
     cand.subints = new_subints
     return cand
+
+
+def random_shift(subs):
+    diff = random.randint(0, len(subs[0]))
+    new_subs = numpy.zeros((19, 64))
+    i = 0
+    for arr in subs:
+        new_arr = arr[diff:]
+        new_array = numpy.append(new_arr, arr[:diff])
+        new_subs[i] = new_array
+        i += 1
+    return new_subs    
 
 
 def subbands_plot(subbands, name):
@@ -256,11 +264,15 @@ def save_subplots(path, dirpath, ext, is_pulsar):
         os.path.abspath(path)
         )
     fname = fname.split('.')[0]
+
+    subbands_plot(cand.subbands, os.path.join(dirpath, fname + bands_str + ext))
+    subints_plot(cand.subints, os.path.join(dirpath, fname + ints_str + ext))
+
     if is_pulsar:
         transform_subbands(cand)
         transform_subints(cand)
-    subbands_plot(cand.subbands, os.path.join(dirpath, fname + bands_str + ext))
-    subints_plot(cand.subints, os.path.join(dirpath, fname + ints_str + ext))
+    subbands_plot(cand.subbands, os.path.join('./trans_pulsar_plots/', fname + bands_str + ext))
+    subints_plot(cand.subints, os.path.join('./trans_pulsar_plots/', fname + ints_str + ext))
 
 
 def add_plots(plots, weights):
@@ -274,7 +286,7 @@ def add_plots(plots, weights):
 def make_artificial_pulsar():
     ext = ".png"
     source_dir = './pulsars/'
-    target_dir = './artificial/'
+    target_dir = './artificial_plots/'
     fname = 'art_pulsar_'
     bands_str = 'subbands'
     ints_str = 'subints'
@@ -282,20 +294,24 @@ def make_artificial_pulsar():
     pulsar_files = os.listdir(source_dir)
     src_pulsars = []
 
-    a = 0.333
-    b = 0.333
-    c = 1 - (a + b)
+    weights_dividing_points = []
+    for _ in xrange(2):
+        weights_dividing_points.append(random.uniform())
+    weights_dividing_points.sort()
+    a = weights_dividing_points[0]
+    b = weights_dividing_points[1] - weights_dividing_points[0]
+    c = 1 - weights_dividing_points[1]
 
     for i in xrange(3):
         src_pulsar_file = random.choice(pulsar_files)
-        save_subplots(source_dir + src_pulsar_file, target_dir, ext, True)
+        #save_subplots(source_dir + src_pulsar_file, target_dir, ext, True)
         fname = fname + src_pulsar_file[-9:-5] + '_'
 
         src_pulsar = Candidate(source_dir + src_pulsar_file)
         transform_subbands(src_pulsar)
         transform_subints(src_pulsar)
 
-        phase_plots(src_pulsar)
+        #phase_plots(src_pulsar)
         src_pulsars.append(src_pulsar)
 
     src_subbands = []
@@ -308,22 +324,31 @@ def make_artificial_pulsar():
     subbands = add_plots(src_subbands, [a, b, c])
     subints = add_plots(src_subints, [a, b, c])
 
-    subbands_plot(subbands, os.path.join(target_dir, fname + bands_str + ext))
-    subints_plot(subints, os.path.join(target_dir, fname + ints_str + ext))
+    shifted_subbands = []
+    shifted_subints = []
+    for band in subbands:
+        shifted_subbands.append(random_shift(band))
+    for band in subints:
+        shifted_subints.append(random_shift(band))
+
+    subbands_plot(shifted_subbands, os.path.join(target_dir, fname + bands_str + ext))
+    subints_plot(shifted_subints, os.path.join(target_dir, fname + ints_str + ext))
 
 
 def prepare_data():
-    positive_dirs = './pulsars'
-    negative_dirs = './RFI'
-    positive_trans_plots = './trans_pulsars_plots'
-    negative_plots = './negative_plots'
+    positive_examples = './pulsars/'
+    negative_examples = './RFI/'
+    positive_plots = './pulsar_plots/'
+    negative_plots = './RFI_plots/'
 
     for filename in os.listdir(positive_dirs):
-        save_subplots(positive_dirs + filename, positive_trans_plots, '.png', True)
+        save_subplots(positive_examples + filename, positive_plots, '.png', True)
 
     for filename in os.listdir(negative_dirs):
-        save_subplots(negative_dirs + filename, negative_plots, '.png', True)  
+        save_subplots(negative_examples + filename, negative_plots, '.png', False)  
 
+    for _ in range(0, 20793):
+        make_artificial_pulsar()
 
 
 
@@ -333,12 +358,12 @@ if __name__ == '__main__':
     import os
 
     # # Load example.phcx file (must be in the same directory as this python script)
-    directory, fname = os.path.split(
-        os.path.abspath(__file__)
-        )
-    cand = Candidate(
-        os.path.join(directory, './pulsars/pulsar_0023.phcx')
-        )
+    # directory, fname = os.path.split(
+    #     os.path.abspath(__file__)
+    #     )
+    # cand = Candidate(
+    #     os.path.join(directory, './pulsars/pulsar_0023.phcx')
+    #     )
     
     # Make some cool plots
     
@@ -354,7 +379,7 @@ if __name__ == '__main__':
     # polacz foldery i wsadz w tensorflow
     # w razie problemow z pamiecia uzyj po kawalku z kazdego folderu
 
-    phase_plots(cand)
+    #phase_plots(cand)
     # bullseye_plot(cand)
     
     # transform_subbands(cand)
@@ -372,4 +397,5 @@ if __name__ == '__main__':
     # c = 1 - (a + b)
     # add_plots([cand0.subbands, cand1.subbands, cand2.subbands], [a, b, c])
 
-    make_artificial_pulsar()
+    # make_artificial_pulsar()
+    prepare_data()
